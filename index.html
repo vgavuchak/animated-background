@@ -1,0 +1,181 @@
+﻿<!-- v4 -->
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Animated canvas background</title>
+
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100%;
+        }
+
+        canvas {
+            display: block;
+            position: fixed;
+            z-index: 0;
+            top: 0;
+            left: 0;
+        }
+
+        .bg {
+            background: linear-gradient(90deg, rgb(75, 121, 207), rgb(162, 75, 207));
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            z-index: 0;
+            top: 0;
+            left: 0;
+        }
+
+        .page-wrapper {
+            z-index: 1;
+            position: relative;
+            width: 100%;
+            min-height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-wrapper"></div>
+
+    <div class="bg"></div>
+    <canvas id="canvas"></canvas>
+    <script>
+        function randomInRange(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        };
+
+        document.addEventListener("DOMContentLoaded", function () {
+            (function () {
+                var canvas = document.querySelector('canvas'),
+                    ctx = canvas.getContext('2d'), colorDot = '#fcfcfc', color = '#fff';
+
+                // 'float | 0' == Math.floor
+                var circle = { // init center position
+                    x: (window.innerWidth / 2) | 0, // center based on canvas size
+                    y: (window.innerHeight / 2) | 0, // center based on canvas size
+                    radius: 150 // circle radius
+                };
+
+                var model = {
+                    totalPoints: (window.innerWidth / 5) | 0,
+                    maxDistance: 140, // max distance between two points 
+                    points: Array.from(Array((window.innerWidth / 5) | 0), () => new Point())
+                };
+
+                var refreshCanvasSize = function () {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                    ctx.lineWidth = .35;
+
+                    model.totalPoints = (canvas.width / 5) | 0;
+                    model.points = Array.from(Array(model.totalPoints), () => new Point());
+
+                    circle.x = (canvas.width / 2) | 0;
+                    circle.y = (canvas.height / 2) | 0;
+                };
+                refreshCanvasSize();
+
+
+                function Point() {
+                    this.x = (Math.random() * canvas.width) | 0; // initial X-axis position
+                    this.y = (Math.random() * canvas.height) | 0; // initial Y-axis position 
+                    this.vx = -.5 + Math.random(); // X-axis offset
+                    this.vy = -.5 + Math.random(); // Y-axis offset
+                    this.radius = Math.random() + .7; // point radius
+                }
+
+                // point render function
+                Point.prototype.render = function () {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+                    ctx.fill();
+                };
+
+                // function that move point by X-axis and Y-axis 
+                // pseudo-animation
+                Point.prototype.animate = function () {
+                    if (this.y < 0 || this.y > canvas.height) {
+                        this.vx = this.vx;
+                        this.vy = -this.vy;
+                    }
+                    else if (this.x < 0 || this.x > canvas.width) {
+                        this.vx = -this.vx;
+                        this.vy = this.vy;
+                    }
+                    this.x += this.vx;
+                    this.y += this.vy;
+                }
+
+                // function that render lines between two points 
+                // that(points) in a circle with center 'circle.x/y' and radius circle.radius
+                // distance between points must be less then model.distance
+                function renderLines() {
+                    ctx.beginPath();
+                    ignore = {};
+                    for (i = 0; i < model.totalPoints; i++) {
+                        outerPoint = model.points[i];
+                        // check point is in a circle
+                        distanceToCenter = Math.sqrt(Math.pow(circle.x - outerPoint.x, 2) + Math.pow(circle.y - outerPoint.y, 2));
+                        if (distanceToCenter < circle.radius) {
+                            for (j = 0; j < model.totalPoints; j++) {
+                                // skip this point when is ignored
+                                if (ignore[j]) continue;
+
+                                innerPoint = model.points[j];
+                                // check distance between points
+                                if (Math.sqrt(Math.pow(innerPoint.x - outerPoint.x, 2) + Math.pow(innerPoint.y - outerPoint.y, 2)) < model.maxDistance) {
+                                    ctx.moveTo(outerPoint.x, outerPoint.y);
+                                    ctx.lineTo(innerPoint.x, innerPoint.y);
+                                }
+                            }
+                        } else {
+                            // ignore this point when is  far from circle
+                            if (distanceToCenter > (circle.radius + (model.maxDistance * 1.5)))
+                                ignore[i] = true;
+                        }
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                };
+
+                function clearCanvas() {
+                    ctx.fillStyle = colorDot;
+                    ctx.strokeStyle = color;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                };
+
+                function refresh() {
+                    clearCanvas();
+                    for (i = 0; i < model.totalPoints; i++) {
+                        model.points[i].radius = Math.random() / 2 + .7;
+                        model.points[i].animate();
+                        model.points[i].render();
+                    }
+                    renderLines();
+                };
+
+                window.onresize = refreshCanvasSize;
+                setInterval(refresh, 100);
+                setInterval(() => {
+                    var centerX = circle.x + (randomInRange(-35, 35) * (Math.random() < .5 ? -1 : 1));
+                    var centerY = circle.y + (randomInRange(-35, 35) * (Math.random() < .5 ? -1 : 1));
+                    circle.x = centerX > canvas.width ? centerX - 35 : centerX < 0 ? centerX + 35 : centerX;
+                    circle.y = centerY > canvas.height ? centerY - 35 : centerY < 0 ? centerY + 35 : centerY;
+                    //circle.radius = randomInRange(200, 250);
+                }, 2500);
+
+            })();
+        });
+    </script>
+</body>
+
+</html>
